@@ -1,0 +1,81 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0d0f10;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  color: #b6f7c1;
+}
+
+#terminal {
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #1f2a22;
+  background: #0d0f10;
+}
+
+#tab-strip {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #1a231c;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.tab-chip {
+  padding: 2px 8px;
+  border: 1px solid #274132;
+  border-radius: 3px;
+  color: #7fbf8f;
+  font-size: 11px;
+}
+
+.tab-chip.active {
+  color: #0d0f10;
+  background: #6fe08a;
+  border-color: #6fe08a;
+}
+
+#log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  line-height: 1.5;
+}
+
+#log div {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#input-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-top: 1px solid #1a231c;
+}
+
+#prompt {
+  color: #6fe08a;
+  margin-right: 6px;
+}
+
+#command-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #d8ffe0;
+  font: inherit;
+}

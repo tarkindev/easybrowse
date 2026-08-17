@@ -1,0 +1,25 @@
+{
+  "name": "terminal-browser",
+  "version": "1.0.0",
+  "description": "A terminal-styled desktop web browser",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tarkindev.terminalbrowser",
+    "productName": "Terminal Browser",
+    "win": {
+      "target": "portable"
+    },
+    "files": [
+      "src/**/*"
+    ]
+  }
+}
