@@ -29,6 +29,10 @@ function renderTabs(tabs) {
 window.terminal.onLog(appendLog);
 window.terminal.onClear(clearLog);
 window.terminal.onTabsUpdated(renderTabs);
+window.terminal.onTerminalVisibility((visible) => {
+  document.getElementById('terminal').style.display = visible ? 'flex' : 'none';
+  if (visible) inputEl.focus();
+});
 
 inputEl.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {

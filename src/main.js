@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 
 const TERMINAL_HEIGHT = 180; // px reserved at top of window for the terminal UI
@@ -7,6 +7,7 @@ let mainWindow = null;
 let tabs = []; // { id, view, url, title, loading }
 let activeTabId = null;
 let nextTabId = 1;
+let terminalHidden = false;
 
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -50,12 +51,23 @@ function layoutActiveView() {
   const bounds = mainWindow.getContentBounds();
   const active = tabs.find((t) => t.id === activeTabId);
   if (!active) return;
+  const topOffset = terminalHidden ? 0 : TERMINAL_HEIGHT;
   active.view.setBounds({
     x: 0,
-    y: TERMINAL_HEIGHT,
+    y: topOffset,
     width: bounds.width,
-    height: Math.max(bounds.height - TERMINAL_HEIGHT, 0),
+    height: Math.max(bounds.height - topOffset, 0),
   });
+}
+
+function setTerminalHidden(hidden) {
+  terminalHidden = hidden;
+  send('terminal-visibility', !terminalHidden);
+  layoutActiveView();
+}
+
+function toggleTerminal() {
+  setTerminalHidden(!terminalHidden);
 }
 
 function attachView(tab) {
@@ -166,7 +178,7 @@ function handleCommand(raw) {
 
   switch (cmd) {
     case 'help':
-      log('Commands: go <url>, search <query>, back, forward, reload, stop, newtab [url], closetab <n>, tab <n>, tabs, clear, help');
+      log('Commands: go <url>, search <query>, back, forward, reload, stop, newtab [url], closetab <n>, tab <n>, tabs, clear, hide, show, help. Ctrl+Space toggles the terminal.');
       break;
 
     case 'go': {
@@ -263,6 +275,17 @@ function handleCommand(raw) {
       break;
     }
 
+    case 'hide': {
+      setTerminalHidden(true);
+      break;
+    }
+
+    case 'show': {
+      setTerminalHidden(false);
+      log('Terminal shown. Press Ctrl+Space to hide it again.');
+      break;
+    }
+
     default:
       log(`Unknown command: ${cmd}. Type "help" for a list of commands.`);
   }
@@ -284,7 +307,7 @@ function createWindow() {
   mainWindow.on('resize', layoutActiveView);
 
   mainWindow.webContents.on('did-finish-load', () => {
-    log('Terminal Browser ready. Type "help" for commands.');
+    log('Terminal Browser ready. Type "help" for commands. Ctrl+Space toggles the terminal.');
     createTab(null);
   });
 
@@ -293,10 +316,17 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  globalShortcut.register('CommandOrControl+Space', toggleTerminal);
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('activate', () => {
