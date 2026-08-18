@@ -1,12 +1,12 @@
-# Terminal Browser
+# EasyBrowse
 
-A desktop web browser with a terminal-style interface instead of the usual address bar and buttons. You type commands, it does browser stuff. Built with Electron.
+A desktop web browser that has a terminal-style interface rather than the normal address bar and buttons; you enter commands and it carries out browsing tasks. It is built using Electron.
 
-No install required to use it, no tracking, no accounts, no bloat. Just a window that browses the web and takes commands.
+There is no need to install it, no tracking, no accounts, no unnecessary extra features, just a window that browses the web and accepts commands.
 
 ## Why
 
-Wanted something lightweight that felt more like a tool than a product. Regular browsers have gotten heavy with tab groups, sync accounts, extension stores, and a dozen menus you never open. This is the opposite: a command line where the output happens to be a webpage.
+I was looking for something lightweight that had the feel of a tool rather than a product. Ordinary browsers have become heavy due to things like tab groups, syncing accounts, extension stores, and all those menus which you never use. This one is the opposite: it's a command line and the result is a webpage.
 
 ## Features
 
@@ -37,7 +37,7 @@ Wanted something lightweight that felt more like a tool than a product. Regular 
 | `Alt+Left` / `Alt+Right` | Back / forward |
 | `Ctrl+Space` | Show or hide the terminal bar |
 
-These work whether the terminal bar or the loaded page has focus.
+It makes no difference whether the terminal bar or the loaded page has focus.
 
 ## Commands
 
@@ -79,7 +79,7 @@ npm install
 npm start
 ```
 
-That's it. A window opens with an empty tab and a terminal bar on top.
+That's all there is to it; a window appears with an empty tab and a terminal bar at the top.
 
 ## Building a standalone exe
 
@@ -88,21 +88,21 @@ npm install
 npm run build
 ```
 
-Output lands in `dist/` as a single portable `.exe`. No installer, nothing to configure, just copy the file and run it. If you're building this yourself on Windows for the first time, you may need to turn on Developer Mode (Settings > Privacy & Security > For developers) since the build process needs permission to create symlinks.
+The output is a single portable .exe file and ends up in the dist/ folder. There is no installer and no need for any configuration—you just have to copy the file and then run it. When building this yourself for the first time on Windows, you might have to enable Developer Mode (under Settings > Privacy & Security > For developers) as the build process requires permission to create symlinks.
 
 ## Loading extensions
 
-`loadext` expects a folder with a `manifest.json` in it, the same format the Chrome Web Store uses for unpacked extensions. Firefox `.xpi` files won't work here, they're a different format entirely. Most popular extensions publish a Chromium build separately from their GitHub releases page if you don't want to go through the Chrome Web Store.
+The loadext command requires a folder containing a manifest.json file, identical to the format used by the Chrome Web Store for unpacked extensions; Firefox .xpi files won't work in this case since they are a completely different format. If you don't wish to use the Chrome Web Store, most widely used extensions provide a Chromium version separately on their GitHub releases page.
 
 ## Project structure
 
 ```
 src/
-  main.js       Electron main process: window, tabs, spaces, commands, menu, downloads
-  preload.js    IPC bridge between main and renderer
+  In the Electron environment the main process handles windows, tabs, spaces, commands, the menu and downloads.
+  preload.js connects the main and renderer processes through IPC.
   index.html    Terminal UI shell
   styles.css    Terminal styling
-  renderer.js   Input handling, log rendering, tab strip
+  renderer.js. Handles input, shows logs, manages the tab strip.
 ```
 
 ## Known limitations
