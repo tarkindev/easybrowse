@@ -1,6 +1,6 @@
 {
   "name": "terminal-browser",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "A terminal-styled desktop web browser",
   "main": "src/main.js",
   "scripts": {
@@ -16,8 +16,8 @@
     "electron-store": "^8.2.0"
   },
   "build": {
-    "appId": "com.tarkindev.terminalbrowser",
-    "productName": "Terminal Browser",
+    "appId": "com.tarkindev.easybrowse",
+    "productName": "EasyBrowse",
     "win": {
       "target": "portable"
     },
