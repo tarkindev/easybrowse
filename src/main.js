@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, globalShortcut, session } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, globalShortcut, session, Menu } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 
@@ -7,13 +7,15 @@ const store = new Store();
 const TERMINAL_HEIGHT = 180; // px reserved at top of window for the terminal UI
 
 let mainWindow = null;
-let tabs = []; // { id, view, url, title, loading, spaceId }
+let tabs = []; // { id, view, url, title, loading, spaceId, favicon }
 let spaces = []; // { id, name }
 let activeTabId = null;
 let activeSpaceId = null;
 let nextTabId = 1;
 let nextSpaceId = 1;
 let terminalHidden = false;
+let lastFindText = '';
+let visitHistory = []; // { url, title, time }
 
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -35,6 +37,7 @@ function tabsSnapshot() {
     url: t.url,
     title: t.title,
     active: t.id === activeTabId,
+    favicon: t.favicon || '',
   }));
 }
 
@@ -84,6 +87,11 @@ function toggleTerminal() {
   setTerminalHidden(!terminalHidden);
 }
 
+function focusCommandBar(prefill) {
+  setTerminalHidden(false);
+  send('focus-input', prefill === undefined ? '' : prefill);
+}
+
 function attachView(tab) {
   mainWindow.setBrowserView(tab.view);
   layoutActiveView();
@@ -124,6 +132,38 @@ function switchToSpaceByName(name) {
   log(`Switched to space "${space.name}".`);
 }
 
+function attachContextMenu(view, tab) {
+  view.webContents.on('context-menu', (_event, params) => {
+    const template = [];
+
+    template.push({ label: 'Back', enabled: view.webContents.canGoBack(), click: () => view.webContents.goBack() });
+    template.push({ label: 'Forward', enabled: view.webContents.canGoForward(), click: () => view.webContents.goForward() });
+    template.push({ label: 'Reload', click: () => view.webContents.reload() });
+    template.push({ type: 'separator' });
+
+    if (params.linkURL) {
+      template.push({ label: 'Open Link in New Tab', click: () => createTab(params.linkURL, tab.spaceId) });
+      template.push({ label: 'Copy Link', click: () => require('electron').clipboard.writeText(params.linkURL) });
+      template.push({ type: 'separator' });
+    }
+
+    if (params.selectionText) {
+      template.push({ label: 'Copy', click: () => view.webContents.copy() });
+    }
+    if (params.isEditable) {
+      template.push({ label: 'Cut', click: () => view.webContents.cut() });
+      template.push({ label: 'Paste', click: () => view.webContents.paste() });
+    }
+    if (params.selectionText || params.isEditable) {
+      template.push({ type: 'separator' });
+    }
+
+    template.push({ label: 'Inspect Element', click: () => view.webContents.inspectElement(params.x, params.y) });
+
+    Menu.buildFromTemplate(template).popup({ window: mainWindow });
+  });
+}
+
 function createTab(rawUrl, spaceId) {
   const targetSpaceId = spaceId || activeSpaceId;
   const id = nextTabId++;
@@ -134,7 +174,7 @@ function createTab(rawUrl, spaceId) {
     },
   });
 
-  const tab = { id, view, url: '', title: 'New Tab', loading: false, spaceId: targetSpaceId };
+  const tab = { id, view, url: '', title: 'New Tab', loading: false, spaceId: targetSpaceId, favicon: '' };
   tabs.push(tab);
 
   view.webContents.on('did-start-loading', () => {
@@ -150,9 +190,14 @@ function createTab(rawUrl, spaceId) {
     tab.title = title || tab.url || 'New Tab';
     broadcastTabs();
   });
+  view.webContents.on('page-favicon-updated', (_e, favicons) => {
+    tab.favicon = (favicons && favicons[0]) || '';
+    broadcastTabs();
+  });
   view.webContents.on('did-navigate', (_e, url) => {
     tab.url = url;
     log(`Loaded ${url}`);
+    visitHistory.push({ url, title: tab.title, time: Date.now() });
     broadcastTabs();
   });
   view.webContents.on('did-navigate-in-page', (_e, url) => {
@@ -163,6 +208,15 @@ function createTab(rawUrl, spaceId) {
     if (errorCode === -3) return;
     log(`Failed to load ${validatedURL || tab.url}: ${errorDescription}`);
   });
+  view.webContents.on('found-in-page', (_e, result) => {
+    log(`Match ${result.activeMatchOrdinal} of ${result.matches}`);
+  });
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    createTab(url, tab.spaceId);
+    return { action: 'deny' };
+  });
+
+  attachContextMenu(view, tab);
 
   if (targetSpaceId === activeSpaceId) {
     switchTab(id);
@@ -315,6 +369,79 @@ function unloadExtension(index) {
   log(`Unloaded extension "${ext.name}".`);
 }
 
+function addBookmark(id) {
+  const tab = tabs.find((t) => t.id === id);
+  if (!tab) {
+    log(`No tab ${id}`);
+    return;
+  }
+  const bookmarks = store.get('bookmarks', []);
+  const exists = bookmarks.some((b) => b.url === tab.url);
+  if (!exists) {
+    bookmarks.push({ url: tab.url, title: tab.title || tab.url });
+    store.set('bookmarks', bookmarks);
+  }
+  log(`Bookmarked "${tab.title}".`);
+}
+
+function removeBookmark(index) {
+  const bookmarks = store.get('bookmarks', []);
+  if (!bookmarks[index - 1]) {
+    log(`No bookmark ${index}`);
+    return;
+  }
+  const removed = bookmarks.splice(index - 1, 1)[0];
+  store.set('bookmarks', bookmarks);
+  log(`Removed bookmark "${removed.title}".`);
+}
+
+function listBookmarks() {
+  const bookmarks = store.get('bookmarks', []);
+  if (bookmarks.length === 0) {
+    log('No bookmarks.');
+    return;
+  }
+  bookmarks.forEach((b, i) => log(`${i + 1}. ${b.title} - ${b.url}`));
+}
+
+function openBookmark(index) {
+  const bookmarks = store.get('bookmarks', []);
+  const bookmark = bookmarks[index - 1];
+  if (!bookmark) {
+    log(`No bookmark ${index}`);
+    return;
+  }
+  createTab(bookmark.url, activeSpaceId);
+}
+
+function findInPage(text) {
+  const tab = activeTab();
+  if (!tab) { log('No active tab.'); return; }
+  if (!text) { log('Usage: find <text>'); return; }
+  lastFindText = text;
+  tab.view.webContents.findInPage(text);
+}
+
+function findStep(forward) {
+  const tab = activeTab();
+  if (!tab || !lastFindText) { log('No active search. Use find <text> first.'); return; }
+  tab.view.webContents.findInPage(lastFindText, { forward, findNext: true });
+}
+
+function stopFind() {
+  const tab = activeTab();
+  if (tab) tab.view.webContents.stopFindInPage('clearSelection');
+}
+
+function showHistory() {
+  if (visitHistory.length === 0) {
+    log('No history yet this session.');
+    return;
+  }
+  const recent = visitHistory.slice(-20).reverse();
+  recent.forEach((h, i) => log(`${i + 1}. ${h.title || h.url} - ${h.url}`));
+}
+
 function handleCommand(raw) {
   const trimmed = raw.trim();
   if (!trimmed) return;
@@ -325,7 +452,7 @@ function handleCommand(raw) {
 
   switch (cmd) {
     case 'help':
-      log('Commands: go <url>, search <query>, back, forward, reload, stop, newtab [url], closetab <n>, tab <n>, tabs, space <name>, spaces, movetab <n> <space>, save <n>, unsave <n>, saved, loadext <path>, extensions, unloadext <n>, clear, hide, show, help. Ctrl+Space toggles the terminal.');
+      log('Nav: go, search, back, forward, reload, stop. Tabs: newtab, closetab, tab, tabs. Spaces: space, spaces, movetab. Saved: save, unsave, saved. Bookmarks: bookmark, bookmarks, openbookmark, unbookmark. Find: find, findnext, findprev, stopfind. Other: history, extensions, loadext, unloadext, clear, hide, show. Shortcuts: Ctrl+T new tab, Ctrl+W close tab, Ctrl+L command bar, Ctrl+F find, Alt+Left/Right back/forward, Ctrl+Space toggle terminal.');
       break;
 
     case 'go': {
@@ -462,6 +589,63 @@ function handleCommand(raw) {
       break;
     }
 
+    case 'bookmark': {
+      const n = parseInt(argStr, 10);
+      if (!Number.isFinite(n)) { log('Usage: bookmark <n>'); break; }
+      addBookmark(n);
+      break;
+    }
+
+    case 'unbookmark': {
+      const n = parseInt(argStr, 10);
+      if (!Number.isFinite(n)) { log('Usage: unbookmark <n>'); break; }
+      removeBookmark(n);
+      break;
+    }
+
+    case 'bookmarks': {
+      listBookmarks();
+      break;
+    }
+
+    case 'openbookmark': {
+      const n = parseInt(argStr, 10);
+      if (!Number.isFinite(n)) { log('Usage: openbookmark <n>'); break; }
+      openBookmark(n);
+      break;
+    }
+
+    case 'find': {
+      findInPage(argStr);
+      break;
+    }
+
+    case 'findnext': {
+      findStep(true);
+      break;
+    }
+
+    case 'findprev': {
+      findStep(false);
+      break;
+    }
+
+    case 'stopfind': {
+      stopFind();
+      break;
+    }
+
+    case 'history': {
+      showHistory();
+      break;
+    }
+
+    case 'clearhistory': {
+      visitHistory = [];
+      log('History cleared.');
+      break;
+    }
+
     case 'loadext': {
       if (!argStr) { log('Usage: loadext <path to unpacked extension folder>'); break; }
       loadExtension(argStr);
@@ -523,6 +707,41 @@ function restoreSavedTabs() {
   return true;
 }
 
+function setupDownloads() {
+  session.defaultSession.on('will-download', (_event, item) => {
+    const savePath = path.join(app.getPath('downloads'), item.getFilename());
+    item.setSavePath(savePath);
+    log(`Downloading ${item.getFilename()}...`);
+    item.on('done', (_e, state) => {
+      if (state === 'completed') {
+        log(`Downloaded ${item.getFilename()} to Downloads.`);
+      } else {
+        log(`Download failed: ${item.getFilename()} (${state})`);
+      }
+    });
+  });
+}
+
+function buildAppMenu() {
+  const template = [
+    {
+      label: 'Browser',
+      submenu: [
+        { label: 'New Tab', accelerator: 'CommandOrControl+T', click: () => createTab(null, activeSpaceId) },
+        { label: 'Close Tab', accelerator: 'CommandOrControl+W', click: () => { if (activeTabId) closeTab(activeTabId); } },
+        { label: 'Focus Command Bar', accelerator: 'CommandOrControl+L', click: () => focusCommandBar('') },
+        { label: 'Find in Page', accelerator: 'CommandOrControl+F', click: () => focusCommandBar('find ') },
+        { type: 'separator' },
+        { label: 'Back', accelerator: 'Alt+Left', click: () => { const t = activeTab(); if (t && t.view.webContents.canGoBack()) t.view.webContents.goBack(); } },
+        { label: 'Forward', accelerator: 'Alt+Right', click: () => { const t = activeTab(); if (t && t.view.webContents.canGoForward()) t.view.webContents.goForward(); } },
+        { label: 'Reload', accelerator: 'CommandOrControl+R', click: () => { const t = activeTab(); if (t) t.view.webContents.reload(); } },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  if (mainWindow) mainWindow.setMenuBarVisibility(false);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -537,6 +756,9 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   mainWindow.on('resize', layoutActiveView);
+
+  buildAppMenu();
+  setupDownloads();
 
   mainWindow.webContents.on('did-finish-load', async () => {
     log('Terminal Browser ready. Type "help" for commands. Ctrl+Space toggles the terminal.');

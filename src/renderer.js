@@ -22,7 +22,19 @@ function renderTabs(tabs) {
   tabs.forEach((t) => {
     const chip = document.createElement('span');
     chip.className = 'tab-chip' + (t.active ? ' active' : '');
-    chip.textContent = `[${t.id}] ${t.title || 'New Tab'}`;
+
+    if (t.favicon) {
+      const icon = document.createElement('img');
+      icon.src = t.favicon;
+      icon.className = 'tab-favicon';
+      icon.onerror = () => { icon.style.display = 'none'; };
+      chip.appendChild(icon);
+    }
+
+    const label = document.createElement('span');
+    label.textContent = `[${t.id}] ${t.title || 'New Tab'}`;
+    chip.appendChild(label);
+
     tabListEl.appendChild(chip);
   });
 }
@@ -38,6 +50,13 @@ window.terminal.onSpaceUpdated(renderSpace);
 window.terminal.onTerminalVisibility((visible) => {
   document.getElementById('terminal').style.display = visible ? 'flex' : 'none';
   if (visible) inputEl.focus();
+});
+window.terminal.onFocusInput((prefill) => {
+  if (typeof prefill === 'string') {
+    inputEl.value = prefill;
+  }
+  inputEl.focus();
+  inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
 });
 
 inputEl.addEventListener('keydown', (event) => {

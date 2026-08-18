@@ -48,11 +48,19 @@ body {
 }
 
 .tab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   border: 1px solid #274132;
   border-radius: 3px;
   color: #7fbf8f;
   font-size: 11px;
+}
+
+.tab-favicon {
+  width: 12px;
+  height: 12px;
 }
 
 .tab-chip.active {
