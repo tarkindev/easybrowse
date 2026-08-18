@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('terminal', {
   onClear: (callback) => ipcRenderer.on('clear-log', () => callback()),
   onTabsUpdated: (callback) => ipcRenderer.on('tabs-updated', (_event, tabs) => callback(tabs)),
   onTerminalVisibility: (callback) => ipcRenderer.on('terminal-visibility', (_event, visible) => callback(visible)),
+  onSpaceUpdated: (callback) => ipcRenderer.on('space-updated', (_event, name) => callback(name)),
 });

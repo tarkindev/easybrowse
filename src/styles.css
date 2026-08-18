@@ -26,11 +26,25 @@ body {
 
 #tab-strip {
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 6px 10px;
   border-bottom: 1px solid #1a231c;
   overflow-x: auto;
   white-space: nowrap;
+}
+
+#space-label {
+  color: #6fe08a;
+  font-size: 11px;
+  margin-right: 6px;
+  border-right: 1px solid #274132;
+  padding-right: 8px;
+}
+
+#tab-list {
+  display: flex;
+  gap: 6px;
 }
 
 .tab-chip {

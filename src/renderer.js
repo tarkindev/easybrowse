@@ -1,6 +1,7 @@
 const logEl = document.getElementById('log');
 const inputEl = document.getElementById('command-input');
-const tabStripEl = document.getElementById('tab-strip');
+const tabListEl = document.getElementById('tab-list');
+const spaceLabelEl = document.getElementById('space-label');
 
 const history = [];
 let historyIndex = -1;
@@ -17,18 +18,23 @@ function clearLog() {
 }
 
 function renderTabs(tabs) {
-  tabStripEl.innerHTML = '';
+  tabListEl.innerHTML = '';
   tabs.forEach((t) => {
     const chip = document.createElement('span');
     chip.className = 'tab-chip' + (t.active ? ' active' : '');
     chip.textContent = `[${t.id}] ${t.title || 'New Tab'}`;
-    tabStripEl.appendChild(chip);
+    tabListEl.appendChild(chip);
   });
+}
+
+function renderSpace(name) {
+  spaceLabelEl.textContent = name ? `space: ${name}` : '';
 }
 
 window.terminal.onLog(appendLog);
 window.terminal.onClear(clearLog);
 window.terminal.onTabsUpdated(renderTabs);
+window.terminal.onSpaceUpdated(renderSpace);
 window.terminal.onTerminalVisibility((visible) => {
   document.getElementById('terminal').style.display = visible ? 'flex' : 'none';
   if (visible) inputEl.focus();
